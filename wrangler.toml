@@ -9,11 +9,6 @@ main = ".open-next/worker.js"
 directory = ".open-next/assets"
 binding = "ASSETS"
 
-# D1 数据库绑定
-[[d1_databases]]
-binding = "DB"
-database_name = "moontvplus"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
 # 环境变量配置
 # 所有变量统一在此管理，避免每次部署被覆盖
