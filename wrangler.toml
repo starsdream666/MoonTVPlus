@@ -15,6 +15,14 @@ binding = "DB"
 database_name = "moontvplus"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
+# 环境变量配置
+# 所有变量统一在此管理，避免每次部署被覆盖
 [vars]
 NODE_ENV = "production"
 BUILD_TARGET = "cloudflare"
+USERNAME = "star"
+PASSWORD = "boyu123456789"
+NEXT_PUBLIC_DISABLE_YELLOW_FILTER = "true"
+NEXT_PUBLIC_STORAGE_TYPE = "upstash"
+UPSTASH_URL = "https://saved-crow-43905.upstash.io"
+UPSTASH_TOKEN = "AauBAAIncDI4ZmYxMzI4YjI1ZDE0ZGI1YTAyMTc3ODY2Nzg3NmJmNnAyNDM5MDU"
