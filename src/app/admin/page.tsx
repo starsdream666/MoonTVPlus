@@ -25,6 +25,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Bot,
+  Cat,
   Check,
   CheckCircle,
   ChevronDown,
@@ -50,6 +51,7 @@ import { createPortal } from 'react-dom';
 import { AdminConfig, AdminConfigResult } from '@/lib/admin.types';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 
+import AnimeSubscriptionComponent from '@/components/AnimeSubscriptionComponent';
 import CorrectDialog from '@/components/CorrectDialog';
 import DataMigration from '@/components/DataMigration';
 import PageLayout from '@/components/PageLayout';
@@ -3510,7 +3512,9 @@ const EmbyConfigComponent = ({
     appendMediaSourceId: false,
     transcodeMp4: false,
     proxyPlay: false,
+    customUserAgent: '',
   });
+  const [authMode, setAuthMode] = useState<'apikey' | 'password'>('apikey');
 
   // 从配置加载源列表
   useEffect(() => {
@@ -3549,7 +3553,9 @@ const EmbyConfigComponent = ({
       appendMediaSourceId: false,
       transcodeMp4: false,
       proxyPlay: false,
+      customUserAgent: '',
     });
+    setAuthMode('apikey');
     setEditingSource(null);
     setShowAddForm(false);
   };
@@ -3557,6 +3563,14 @@ const EmbyConfigComponent = ({
   // 开始编辑
   const handleEdit = (source: any) => {
     setFormData({ ...source });
+    // 根据现有配置判断认证方式
+    if (source.ApiKey) {
+      setAuthMode('apikey');
+    } else if (source.Username) {
+      setAuthMode('password');
+    } else {
+      setAuthMode('apikey');
+    }
     setEditingSource(source);
     setShowAddForm(false);
   };
@@ -3573,6 +3587,19 @@ const EmbyConfigComponent = ({
     if (!formData.key || !formData.name || !formData.ServerURL) {
       showError('请填写必填字段：标识符、名称、服务器地址', showAlert);
       return;
+    }
+
+    // 根据认证方式验证必填字段
+    if (authMode === 'apikey') {
+      if (!formData.ApiKey || !formData.UserId) {
+        showError('使用密钥认证时，API Key 和用户 ID 为必填项', showAlert);
+        return;
+      }
+    } else if (authMode === 'password') {
+      if (!formData.Username) {
+        showError('使用账号认证时，用户名为必填项', showAlert);
+        return;
+      }
     }
 
     // 验证key唯一性
@@ -4084,67 +4111,119 @@ const EmbyConfigComponent = ({
               />
             </div>
 
-            {/* API Key */}
+            {/* 认证方式切换卡 */}
             <div>
               <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                API Key（推荐）
+                认证方式 *
               </label>
-              <input
-                type='password'
-                value={formData.ApiKey}
-                onChange={(e) => setFormData({ ...formData, ApiKey: e.target.value })}
-                placeholder='输入 Emby API Key'
-                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-              />
-              <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                推荐使用 API Key 认证。如果不使用 API Key，请填写下方的用户名和密码。
-              </p>
+              <div className='flex gap-2 mb-4'>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setAuthMode('apikey');
+                    // 切换到密钥认证时，清空用户名密码
+                    setFormData({ ...formData, Username: '', Password: '' });
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    authMode === 'apikey'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  密钥认证
+                </button>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setAuthMode('password');
+                    // 切换到账号认证时，清空 API Key 和 UserId
+                    setFormData({ ...formData, ApiKey: '', UserId: '' });
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    authMode === 'password'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  账号认证
+                </button>
+              </div>
             </div>
 
-            {/* 用户名 */}
-            <div>
-              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                用户名（可选）
-              </label>
-              <input
-                type='text'
-                value={formData.Username}
-                onChange={(e) => setFormData({ ...formData, Username: e.target.value })}
-                placeholder='Emby 用户名'
-                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-              />
-            </div>
+            {/* 密钥认证模式 */}
+            {authMode === 'apikey' && (
+              <>
+                {/* API Key */}
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                    API Key *
+                  </label>
+                  <input
+                    type='password'
+                    value={formData.ApiKey}
+                    onChange={(e) => setFormData({ ...formData, ApiKey: e.target.value })}
+                    placeholder='输入 Emby API Key'
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  />
+                  <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+                    在 Emby 控制台的 API 密钥页面生成
+                  </p>
+                </div>
 
-            {/* 密码 */}
-            <div>
-              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                密码（可选）
-              </label>
-              <input
-                type='password'
-                value={formData.Password}
-                onChange={(e) => setFormData({ ...formData, Password: e.target.value })}
-                placeholder='Emby 密码'
-                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-              />
-            </div>
+                {/* 用户 ID */}
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                    用户 ID *
+                  </label>
+                  <input
+                    type='text'
+                    value={formData.UserId}
+                    onChange={(e) => setFormData({ ...formData, UserId: e.target.value })}
+                    placeholder='aab507c58e874de6a9bd12388d72f4d2'
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  />
+                  <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+                    从你的 Emby 抓包数据中获取用户 ID，通常在 URL 中如 /Users/[userId]/...
+                  </p>
+                </div>
+              </>
+            )}
 
-            {/* 用户 ID */}
-            <div>
-              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-                用户 ID（使用 API Key 时必填）
-              </label>
-              <input
-                type='text'
-                value={formData.UserId}
-                onChange={(e) => setFormData({ ...formData, UserId: e.target.value })}
-                placeholder='aab507c58e874de6a9bd12388d72f4d2'
-                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-              />
-              <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                从你的 Emby 抓包数据中获取用户 ID，通常在 URL 中如 /Users/[userId]/...
-              </p>
-            </div>
+            {/* 账号认证模式 */}
+            {authMode === 'password' && (
+              <>
+                {/* 用户名 */}
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                    用户名 *
+                  </label>
+                  <input
+                    type='text'
+                    value={formData.Username}
+                    onChange={(e) => setFormData({ ...formData, Username: e.target.value })}
+                    placeholder='Emby 用户名'
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  />
+                </div>
+
+                {/* 密码 */}
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                    密码（可选）
+                  </label>
+                  <input
+                    type='password'
+                    value={formData.Password}
+                    onChange={(e) => setFormData({ ...formData, Password: e.target.value })}
+                    placeholder='Emby 密码（如果账号没有密码可留空）'
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  />
+                  <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+                    如果 Emby 账号没有设置密码，可以留空
+                  </p>
+                </div>
+              </>
+            )}
 
             {/* 启用开关 */}
             <div className='flex items-center justify-between'>
@@ -4244,7 +4323,7 @@ const EmbyConfigComponent = ({
               </div>
 
               {/* 视频播放代理开关 */}
-              <div className='flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700'>
+              <div className='flex items-center justify-between mb-3'>
                 <div className='flex-1'>
                   <h4 className='text-sm font-medium text-gray-900 dark:text-white'>
                     视频播放代理
@@ -4265,6 +4344,23 @@ const EmbyConfigComponent = ({
                     }`}
                   />
                 </button>
+            </div>
+
+            {/* 自定义User-Agent */}
+            <div className='mb-3'>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                自定义User-Agent
+              </label>
+              <input
+                type='text'
+                value={formData.customUserAgent || ''}
+                onChange={(e) => setFormData({ ...formData, customUserAgent: e.target.value })}
+                placeholder='留空使用默认浏览器UA'
+                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm'
+              />
+              <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                用于登录、获取影片和代理视频时的User-Agent，留空则使用默认浏览器UA
+              </p>
             </div>
             </div>
 
@@ -6266,6 +6362,9 @@ const ThemeConfigComponent = ({
     customCSS: '',
     enableCache: true,
     cacheMinutes: 1440, // 默认1天（1440分钟）
+    progressThumbType: 'default' as 'default' | 'preset' | 'custom',
+    progressThumbPresetId: '',
+    progressThumbCustomUrl: '',
   });
   const [loginBackgroundImages, setLoginBackgroundImages] = useState<string[]>(['']);
   const [registerBackgroundImages, setRegisterBackgroundImages] = useState<string[]>(['']);
@@ -6278,6 +6377,9 @@ const ThemeConfigComponent = ({
         customCSS: config.ThemeConfig.customCSS || '',
         enableCache: config.ThemeConfig.enableCache !== false,
         cacheMinutes: config.ThemeConfig.cacheMinutes || 1440,
+        progressThumbType: config.ThemeConfig.progressThumbType || 'default',
+        progressThumbPresetId: config.ThemeConfig.progressThumbPresetId || '',
+        progressThumbCustomUrl: config.ThemeConfig.progressThumbCustomUrl || '',
       });
 
       // 解析背景图配置
@@ -6707,6 +6809,169 @@ const ThemeConfigComponent = ({
         <p className='mt-4 text-sm text-gray-600 dark:text-gray-400'>
           配置登录和注册页面的背景图链接，留空则使用默认样式。支持配置多张图片，将随机展示其中一张
         </p>
+      </div>
+
+      {/* 进度条图标配置 */}
+      <div className='bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700'>
+        <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2'>
+          <Palette className='w-5 h-5' />
+          进度条图标
+        </h3>
+        <p className='text-sm text-gray-600 dark:text-gray-400 mb-4'>
+          自定义视频播放器进度条的滑块图标，让播放器更具个性
+        </p>
+
+        {/* 图标类型选择 */}
+        <div className='space-y-4 mb-6'>
+          <label className='flex items-center space-x-3 cursor-pointer'>
+            <input
+              type='radio'
+              checked={themeSettings.progressThumbType === 'default'}
+              onChange={() =>
+                setThemeSettings((prev) => ({
+                  ...prev,
+                  progressThumbType: 'default',
+                }))
+              }
+              className='w-4 h-4 text-blue-600'
+            />
+            <span className='text-gray-900 dark:text-gray-100'>
+              默认圆点
+            </span>
+          </label>
+          <label className='flex items-center space-x-3 cursor-pointer'>
+            <input
+              type='radio'
+              checked={themeSettings.progressThumbType === 'preset'}
+              onChange={() =>
+                setThemeSettings((prev) => ({
+                  ...prev,
+                  progressThumbType: 'preset',
+                }))
+              }
+              className='w-4 h-4 text-blue-600'
+            />
+            <span className='text-gray-900 dark:text-gray-100'>
+              内置图标
+            </span>
+          </label>
+          <label className='flex items-center space-x-3 cursor-pointer'>
+            <input
+              type='radio'
+              checked={themeSettings.progressThumbType === 'custom'}
+              onChange={() =>
+                setThemeSettings((prev) => ({
+                  ...prev,
+                  progressThumbType: 'custom',
+                }))
+              }
+              className='w-4 h-4 text-blue-600'
+            />
+            <span className='text-gray-900 dark:text-gray-100'>
+              自定义图标
+            </span>
+          </label>
+        </div>
+
+        {/* 预制图标选择 */}
+        {themeSettings.progressThumbType === 'preset' && (
+          <div className='space-y-3 mb-4'>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300'>
+              选择内置图标
+            </label>
+            <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
+              {[
+                { id: 'renako', name: '玲奈子', url: '/icons/q/renako.png', color: '#ec4899' },
+                { id: 'irena', name: '伊蕾娜', url: '/icons/q/irena.png', color: '#f8fafc' },
+                { id: 'emilia', name: '爱蜜莉雅', url: '/icons/q/emilia.png', color: '#f8fafc' },
+              ].map((thumb) => (
+                <button
+                  key={thumb.id}
+                  type='button'
+                  onClick={() =>
+                    setThemeSettings((prev) => ({
+                      ...prev,
+                      progressThumbPresetId: thumb.id,
+                    }))
+                  }
+                  className={`relative p-4 border-2 rounded-lg transition-all ${
+                    themeSettings.progressThumbPresetId === thumb.id
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <div className='flex flex-col items-center gap-2'>
+                    <img
+                      src={thumb.url}
+                      alt={thumb.name}
+                      className='w-12 h-12 object-contain'
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3E?%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                    <span className='text-sm font-medium text-gray-700 dark:text-gray-300 text-center'>
+                      {thumb.name}
+                    </span>
+                    <div
+                      className='w-8 h-2 rounded-full'
+                      style={{ backgroundColor: thumb.color }}
+                      title='进度条颜色'
+                    />
+                  </div>
+                  {themeSettings.progressThumbPresetId === thumb.id && (
+                    <div className='absolute top-2 right-2'>
+                      <Check className='w-5 h-5 text-blue-600 dark:text-blue-400' />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 自定义图标URL输入 */}
+        {themeSettings.progressThumbType === 'custom' && (
+          <div className='space-y-3'>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300'>
+              自定义图标URL
+            </label>
+            <input
+              type='text'
+              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400'
+              placeholder='例如: https://example.com/icon.png'
+              value={themeSettings.progressThumbCustomUrl}
+              onChange={(e) =>
+                setThemeSettings((prev) => ({
+                  ...prev,
+                  progressThumbCustomUrl: e.target.value,
+                }))
+              }
+            />
+            <p className='text-xs text-gray-500 dark:text-gray-400'>
+              支持 PNG、JPG、GIF、WebP 格式，建议尺寸 32x32px，图片URL必须可公开访问
+            </p>
+            {themeSettings.progressThumbCustomUrl && (
+              <div className='mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg'>
+                <p className='text-xs text-gray-600 dark:text-gray-400 mb-2'>预览：</p>
+                <img
+                  src={themeSettings.progressThumbCustomUrl}
+                  alt='自定义图标预览'
+                  className='w-12 h-12 object-contain border border-gray-300 dark:border-gray-600 rounded'
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent && !parent.querySelector('.error-msg')) {
+                      const errorMsg = document.createElement('p');
+                      errorMsg.className = 'text-xs text-red-500 error-msg';
+                      errorMsg.textContent = '图片加载失败，请检查URL是否正确';
+                      parent.appendChild(errorMsg);
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 保存按钮 */}
@@ -11597,6 +11862,7 @@ function AdminPageClient() {
     openListConfig: false,
     embyConfig: false,
     xiaoyaConfig: false,
+    animeSubscription: false,
     aiConfig: false,
     liveSource: false,
     webLive: false,
@@ -12048,6 +12314,18 @@ function AdminPageClient() {
                   onToggle={() => toggleTab('movieRequests')}
                 >
                   <MovieRequestsComponent config={config} refreshConfig={fetchConfig} />
+                </CollapsibleTab>
+
+                {/* 追番订阅子标签 */}
+                <CollapsibleTab
+                  title='追番订阅'
+                  icon={
+                    <Cat size={20} className='text-gray-600 dark:text-gray-400' />
+                  }
+                  isExpanded={expandedTabs.animeSubscription}
+                  onToggle={() => toggleTab('animeSubscription')}
+                >
+                  <AnimeSubscriptionComponent config={config} refreshConfig={fetchConfig} />
                 </CollapsibleTab>
               </div>
             </CollapsibleTab>
